@@ -1,0 +1,11 @@
+torch
+torchvision
+numpy
+scipy
+h5py
+medpy
+tqdm
+tensorboardX
+segmentation-models-pytorch
+huggingface_hub
+git+https://github.com/facebookresearch/segment-anything.git
