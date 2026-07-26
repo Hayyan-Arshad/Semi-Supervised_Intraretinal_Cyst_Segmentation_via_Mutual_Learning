@@ -10,8 +10,5 @@ tensorboardX
 segmentation-models-pytorch
 huggingface_hub<1.0
 git+https://github.com/facebookresearch/segment-anything.git
-gradio==4.44.1
 streamlit
-fastapi==0.115.2
-pydantic==2.9.2
-starlette==0.40.0
+pillow>=11.3.0
