@@ -22,23 +22,30 @@ class SAMPromptSegmenter(nn.Module):
                 param.requires_grad = False
 
     def forward(self, images, boxes, points, point_labels):
+        masks = [
+            self._forward_one(image, box, point, point_label)
+            for image, box, point, point_label in zip(images, boxes, points, point_labels)
+        ]
+        return torch.cat(masks, dim=0)
+
+    def _forward_one(self, image, box, point, point_label):
         target_size = self.sam.image_encoder.img_size
-        height, width = images.shape[-2:]
-        sam_images = images.repeat(1, 3, 1, 1)
+        height, width = image.shape[-2:]
+        sam_images = image.unsqueeze(0).repeat(1, 3, 1, 1)
         sam_images = F.interpolate(sam_images, size=(target_size, target_size), mode="bilinear", align_corners=False)
         sam_images = self.sam.preprocess(sam_images)
 
         box_scale = torch.tensor(
             [target_size / width, target_size / height, target_size / width, target_size / height],
-            dtype=boxes.dtype,
-            device=boxes.device,
+            dtype=box.dtype,
+            device=box.device,
         )
-        point_scale = torch.tensor([target_size / width, target_size / height], dtype=points.dtype, device=points.device)
+        point_scale = torch.tensor([target_size / width, target_size / height], dtype=point.dtype, device=point.device)
 
         image_embeddings = self.sam.image_encoder(sam_images)
         sparse_embeddings, dense_embeddings = self.sam.prompt_encoder(
-            points=(points[:, None, :] * point_scale, point_labels[:, None]),
-            boxes=boxes * box_scale,
+            points=((point * point_scale).view(1, 1, 2), point_label.view(1, 1)),
+            boxes=(box * box_scale).view(1, 4),
             masks=None,
         )
         low_res_masks, _ = self.sam.mask_decoder(
@@ -49,4 +56,3 @@ class SAMPromptSegmenter(nn.Module):
             multimask_output=False,
         )
         return F.interpolate(low_res_masks, size=(height, width), mode="bilinear", align_corners=False)
-
