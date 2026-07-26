@@ -22,10 +22,12 @@ code/
   networks/      CNN/SAM adapters and model factory
   prompts/       prompt-generation strategies and prompt factory
   trainers/      train-loop implementations and trainer factory
+  inference/     CNN checkpoint loader and single-scan predictor
   utils/         losses, ramps, validation metrics
   tests/         lightweight smoke tests
 scripts/         public dataset download helpers
 train.py         thin entrypoint that builds the selected trainer
+app.py           hostable Gradio inference demo
 ```
 
 ## Documentation
@@ -35,6 +37,7 @@ train.py         thin entrypoint that builds the selected trainer
 - [Datasets](docs/DATASETS.md)
 - [Preprocessing](docs/PREPROCESSING.md)
 - [Training](docs/TRAINING.md)
+- [Deployment](docs/DEPLOYMENT.md)
 
 ## Setup
 
@@ -45,6 +48,8 @@ pip install -r requirements.txt
 ```
 
 Download a SAM or MedSAM ViT-B checkpoint separately and pass it with `--sam_checkpoint`.
+
+The browser demo uses the trained CNN checkpoint and can be launched with `python app.py`. See [Deployment](docs/DEPLOYMENT.md).
 
 ## Train
 
@@ -139,6 +144,7 @@ The first `--labeled_num` entries in `train_slices.list` are treated as labeled.
 ```bash
 python -m py_compile train.py code/**/*.py
 python -m code.tests.test_config
+python -m code.tests.test_inference
 python -m code.tests.smoke_train
 ```
 

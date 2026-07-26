@@ -1,0 +1,7 @@
+torch
+torchvision
+numpy
+scipy
+h5py
+segmentation-models-pytorch
+gradio>=3.50,<4
