@@ -30,6 +30,7 @@ train.py         thin entrypoint that builds the selected trainer
 
 ## Documentation
 
+- [Architecture and algorithm](docs/ARCHITECTURE.md)
 - [Methodology](docs/METHODOLOGY.md)
 - [Datasets](docs/DATASETS.md)
 - [Preprocessing](docs/PREPROCESSING.md)
