@@ -23,3 +23,7 @@ tmp/
 *.pth
 *.pt
 *.ckpt
+
+# The small CNN smoke checkpoint is included for the hosted inference demo.
+!checkpoints/
+!checkpoints/cnn_best.pth
