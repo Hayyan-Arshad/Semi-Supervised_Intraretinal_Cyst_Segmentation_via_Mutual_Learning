@@ -1,3 +1,11 @@
+# SemiSAM System Architecture
+
+## End-to-End Data and Learning Pipeline
+
+SemiSAM couples a deployable convolutional segmentation network with a promptable foundation model during training. The architecture is organized into four stages: patient-wise cohort construction, dual-branch forward propagation, semi-supervised mutual optimization, and CNN-only evaluation.
+
+### 1. Patient-Wise Cohort Construction
+
 ```mermaid
 flowchart TB
     RAW["Raw OCT volumes<br/>B-scans and cyst/fluid masks"] --> PID["Group volumes by patient ID"]
@@ -12,9 +20,9 @@ flowchart TB
         TRAIN --> TSLICES["Extract 2D OCT slices"]
         TSLICES --> TH5["Write one HDF5 file per slice<br/>image H x W | label H x W"]
         TH5 --> TLIST["train_slices.list"]
-        TLIST --> LABEL_SPLIT{"Annotation availability"}
-        LABEL_SPLIT --> LABELED["Labeled slice pool D_l"]
-        LABEL_SPLIT --> UNLABELED["Unlabeled slice pool D_u"]
+        TLIST --> LABEL_SPLIT{"Semi-supervised label allocation"}
+        LABEL_SPLIT --> LABELED["Labeled pool D_l<br/>Masks exposed to the loss"]
+        LABEL_SPLIT --> UNLABELED["Unlabeled pool D_u<br/>Masks withheld from the loss"]
     end
 
     subgraph VAL_DATA["Validation dataset preparation"]
@@ -38,6 +46,10 @@ flowchart TB
     class LABELED labeled;
     class UNLABELED unlabeled;
 ```
+
+*Figure 1. Patient-level partitioning is performed before slice extraction. This prevents correlated B-scans from the same patient appearing across training, validation, and test cohorts.*
+
+### 2. Dual-Branch Forward Propagation
 
 ```mermaid
 flowchart TB
@@ -99,6 +111,10 @@ flowchart TB
     class DETACH,THRESH,EMPTY,BOX,POINT,FULLBOX,NEGPOINT,PROMPTS,RGB,RESIZE,PREP process;
 ```
 
+*Figure 2. The CNN processes every OCT B-scan and produces the mask used to derive a detached box-point prompt. The same image and generated prompt condition SAM or MedSAM, producing a second segmentation at the original OCT resolution.*
+
+### 3. Semi-Supervised Mutual-Learning Objective
+
 ```mermaid
 flowchart TB
     ZCL["CNN logits on labeled samples<br/>z_c_l"] --> CNN_SUP["CNN supervised loss<br/>Dice + binary cross-entropy"]
@@ -107,23 +123,23 @@ flowchart TB
     ZPL["Prompt logits on labeled samples<br/>z_p_l"] --> PROMPT_SUP["Prompt supervised loss<br/>Dice + binary cross-entropy"]
     YL2["Ground-truth masks y_l"] --> PROMPT_SUP
 
-    ZCA["CNN logits on all samples<br/>z_c"] --> C_TO_P["Dice z_p, stopgrad z_c"]
+    ZCA["CNN logits on all samples<br/>z_c"] --> C_TO_P["Dice(z_p, stopgrad(z_c))"]
     ZPA["Prompt logits on all samples<br/>z_p"] --> C_TO_P
-    ZCA --> P_TO_C["Dice z_c, stopgrad z_p"]
+    ZCA --> P_TO_C["Dice(z_c, stopgrad(z_p))"]
     ZPA --> P_TO_C
 
-    CNN_SUP --> LSUP["L_sup = 0.5 x (L_cnn + L_prompt)"]
+    CNN_SUP --> LSUP["L_sup = 0.5 * (L_cnn + L_prompt)"]
     PROMPT_SUP --> LSUP
-    C_TO_P --> LMUTUAL["L_mutual = 0.5 x (L_c_to_p + L_p_to_c)"]
+    C_TO_P --> LMUTUAL["L_mutual = 0.5 * (L_c_to_p + L_p_to_c)"]
     P_TO_C --> LMUTUAL
 
     ITER["Training iteration t"] --> WARMUP{"Supervised warmup complete?"}
-    WARMUP -->|No| ZERO["lambda t = 0"]
-    WARMUP -->|Yes| RAMP["Sigmoid consistency ramp-up<br/>lambda t approaches lambda max"]
-    ZERO --> WEIGHT["Consistency weight lambda t"]
+    WARMUP -->|No| ZERO["lambda(t) = 0"]
+    WARMUP -->|Yes| RAMP["Sigmoid consistency ramp-up<br/>lambda(t) approaches lambda_max"]
+    ZERO --> WEIGHT["Consistency weight lambda(t)"]
     RAMP --> WEIGHT
 
-    LSUP --> TOTAL["L_total = L_sup + lambda t x L_mutual"]
+    LSUP --> TOTAL["L_total = L_sup + lambda(t) * L_mutual"]
     LMUTUAL --> TOTAL
     WEIGHT --> TOTAL
     TOTAL --> ADAM["Joint Adam optimization"]
@@ -141,6 +157,10 @@ flowchart TB
     class ITER,WARMUP,ZERO,RAMP,WEIGHT schedule;
     class TOTAL,ADAM,CNN_UPDATE,PROMPT_UPDATE,POLY_CNN,POLY_PROMPT optimize;
 ```
+
+*Figure 3. Ground-truth supervision is restricted to the labeled subset, whereas bidirectional consistency is evaluated over the complete mixed batch. Stop-gradient targets isolate the learning direction of each consistency term.*
+
+### 4. Patient-Wise Validation and CNN-Only Inference
 
 ```mermaid
 flowchart TB
@@ -175,3 +195,5 @@ flowchart TB
     class SAVE,CHECKPOINT checkpoint;
     class TESTVOL,TNORM,TCNN,TPROB,TMASK,OUTPUT deployment;
 ```
+
+*Figure 4. Model selection uses held-out patient volumes and CNN Dice performance. The promptable branch is a training-time collaborator only; deployment requires the normalized OCT input and the selected CNN checkpoint.*
