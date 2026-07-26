@@ -49,6 +49,7 @@ python train.py \
   --prompt_model sam \
   --prompt_generator mask_box_point \
   --root_path data/OCT_IRF \
+  --intensity_norm zscore \
   --sam_checkpoint checkpoints/sam_vit_b_01ec64.pth \
   --batch_size 9 \
   --labeled_bs 6 \
@@ -62,6 +63,7 @@ Useful switches:
 
 - `--encoder_name`: swap the CNN encoder, for example `efficientnet-b0`, `efficientnet-b2`, or another encoder supported by `segmentation-models-pytorch`.
 - `--encoder_weights`: use `imagenet` or `None`.
+- `--intensity_norm`: OCT intensity normalization. Options: `none`, `minmax`, `zscore`, `clip_zscore`.
 - `--prompt_model`: promptable segmentation branch. Current option: `sam`.
 - `--prompt_generator`: prompt strategy. Current option: `mask_box_point`.
 - `--sam_freeze_image_encoder`: freeze the SAM image encoder.
@@ -102,6 +104,9 @@ Each `.h5` file should contain:
 - `image`: 2D OCT slice for training samples, or 3D volume for validation.
 - `label`: binary intraretinal cyst mask with foreground values greater than zero.
 
+Images are normalized by the dataloader before augmentation/resizing. The default is `--intensity_norm zscore`.
+Labels are not intensity-normalized.
+
 The first `--labeled_num` entries in `train_slices.list` are treated as labeled. Remaining entries are treated as unlabeled and contribute only to consistency loss.
 
 ## Verify
@@ -137,4 +142,3 @@ The helpers write into `datasets/`, which is ignored by Git.
 ## Attribution
 
 This project was prepared from the SSL4MIS code structure and adapted for the semi-supervised SAM + EfficientNet-B2 U-Net intraretinal cyst workflow described in the provided paper. Respect the original licenses and dataset terms before redistribution or publication.
-

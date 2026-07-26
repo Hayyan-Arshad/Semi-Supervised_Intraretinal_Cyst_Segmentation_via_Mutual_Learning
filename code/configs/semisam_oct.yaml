@@ -5,6 +5,7 @@
 trainer: semisam
 dataset: oct_h5
 root_path: data/OCT_IRF
+intensity_norm: zscore
 exp: SemiSAM_EffiB2
 snapshot_path: model
 
@@ -37,4 +38,3 @@ save_every: 3000
 val_every: 200
 num_workers: 4
 device: auto
-

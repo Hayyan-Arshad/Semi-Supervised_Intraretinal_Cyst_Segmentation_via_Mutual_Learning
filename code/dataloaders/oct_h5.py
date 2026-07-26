@@ -14,10 +14,12 @@ from torch.utils.data.sampler import Sampler
 class OCTH5Dataset(Dataset):
     """SSL4MIS-style HDF5 dataset for OCT segmentation."""
 
-    def __init__(self, root, split="train", transform=None, max_samples=None):
+    def __init__(self, root, split="train", transform=None, max_samples=None, intensity_norm="zscore", eps=1e-6):
         self.root = Path(root)
         self.split = split
         self.transform = transform
+        self.intensity_norm = intensity_norm
+        self.eps = eps
         list_name = "train_slices.list" if split == "train" else "val.list"
         with (self.root / list_name).open("r") as handle:
             self.sample_list = [line.strip() for line in handle if line.strip()]
@@ -34,13 +36,29 @@ class OCTH5Dataset(Dataset):
         else:
             path = self.root / "data" / f"{case}.h5"
         with h5py.File(path, "r") as handle:
-            image = handle["image"][:]
+            image = normalize_image(handle["image"][:], self.intensity_norm, self.eps)
             label = handle["label"][:]
         sample = {"image": image, "label": label, "idx": idx}
         if self.transform is not None:
             sample = self.transform(sample)
             sample["idx"] = idx
         return sample
+
+
+def normalize_image(image, mode="zscore", eps=1e-6):
+    image = image.astype(np.float32)
+    if mode in (None, "none"):
+        return image
+    if mode == "minmax":
+        image_min = np.min(image)
+        image_max = np.max(image)
+        return (image - image_min) / max(float(image_max - image_min), eps)
+    if mode == "zscore":
+        return (image - float(np.mean(image))) / max(float(np.std(image)), eps)
+    if mode == "clip_zscore":
+        normalized = (image - float(np.mean(image))) / max(float(np.std(image)), eps)
+        return np.clip(normalized, -5.0, 5.0) / 5.0
+    raise ValueError(f"Unsupported intensity_norm '{mode}'. Available: none, minmax, zscore, clip_zscore")
 
 
 def random_rot_flip(image, label):
@@ -116,4 +134,3 @@ def iterate_eternally(indices):
 def grouper(iterable, n):
     args = [iter(iterable)] * n
     return zip(*args)
-

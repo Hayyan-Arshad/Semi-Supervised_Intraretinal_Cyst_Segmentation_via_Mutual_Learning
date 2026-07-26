@@ -12,6 +12,7 @@ def parse_args(argv=None):
     parser.add_argument("--trainer", type=str, default="semisam")
     parser.add_argument("--dataset", type=str, default="oct_h5")
     parser.add_argument("--root_path", type=str, default="data/OCT_IRF")
+    parser.add_argument("--intensity_norm", type=str, default="zscore", choices=["none", "minmax", "zscore", "clip_zscore"])
     parser.add_argument("--exp", type=str, default="SemiSAM_EffiB2")
     parser.add_argument("--snapshot_path", type=str, default="model")
 
@@ -54,4 +55,3 @@ def set_reproducibility(seed):
     torch.manual_seed(seed)
     cudnn.benchmark = False
     cudnn.deterministic = True
-
