@@ -1,4 +1,5 @@
 import argparse
+import functools
 import logging
 import random
 import shutil
@@ -21,7 +22,12 @@ from semisam.sam_adapter import SAMPromptSegmenter
 from semisam.validation import test_single_volume
 
 
-def parse_args():
+def seed_worker(worker_id, base_seed):
+    random.seed(base_seed + worker_id)
+    np.random.seed(base_seed + worker_id)
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--root_path", type=str, default="data/OCT_IRF")
     parser.add_argument("--exp", type=str, default="SemiSAM_EffiB2")
@@ -43,7 +49,8 @@ def parse_args():
     parser.add_argument("--prompt_margin", type=int, default=4)
     parser.add_argument("--save_every", type=int, default=3000)
     parser.add_argument("--snapshot_path", type=str, default="model")
-    return parser.parse_args()
+    parser.add_argument("--num_workers", type=int, default=4)
+    return parser.parse_args(argv)
 
 
 def create_efficientnet_b2_unet(device):
@@ -78,9 +85,6 @@ def train(args):
         freeze_image_encoder=args.sam_freeze_image_encoder,
     ).to(device)
 
-    def worker_init_fn(worker_id):
-        random.seed(args.seed + worker_id)
-
     db_train = OCTH5Dataset(args.root_path, split="train", transform=RandomGenerator(args.patch_size))
     db_val = OCTH5Dataset(args.root_path, split="val")
     labeled_idxs = list(range(0, args.labeled_num))
@@ -89,9 +93,13 @@ def train(args):
         labeled_idxs, unlabeled_idxs, args.batch_size, args.batch_size - args.labeled_bs
     )
     trainloader = DataLoader(
-        db_train, batch_sampler=batch_sampler, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn
+        db_train,
+        batch_sampler=batch_sampler,
+        num_workers=args.num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=functools.partial(seed_worker, base_seed=args.seed),
     )
-    valloader = DataLoader(db_val, batch_size=1, shuffle=False, num_workers=1)
+    valloader = DataLoader(db_val, batch_size=1, shuffle=False, num_workers=max(0, min(1, args.num_workers)))
 
     optimizer = optim.Adam(
         [
@@ -178,4 +186,3 @@ if __name__ == "__main__":
     cudnn.benchmark = False
     cudnn.deterministic = True
     train(args)
-

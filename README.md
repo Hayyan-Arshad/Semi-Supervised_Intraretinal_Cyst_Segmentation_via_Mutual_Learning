@@ -55,7 +55,8 @@ python train.py \
   --labeled_bs 6 \
   --labeled_num 85 \
   --patch_size 512 512 \
-  --max_iterations 30000
+  --max_iterations 30000 \
+  --num_workers 4
 ```
 
 Useful switches:
@@ -64,6 +65,7 @@ Useful switches:
 - `--warmup_iterations`: number of iterations before consistency loss starts. Default: `1000`.
 - `--consistency_rampup`: ramp length for consistency weight.
 - `--snapshot_path`: local output directory for logs and weights. Ignored by Git.
+- `--num_workers`: data-loading workers. Use `0` for debugging on macOS or notebooks.
 
 ## OCT Dataset Notes
 
@@ -107,4 +109,3 @@ requirements.txt          Python dependencies
 ## Attribution
 
 This project was prepared from the SSL4MIS code structure and adapted for the semi-supervised SAM + EfficientNet-B2 U-Net intraretinal cyst workflow described in the provided paper. Respect the original licenses and dataset terms before redistribution or publication.
-
