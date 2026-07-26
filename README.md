@@ -28,6 +28,13 @@ scripts/         public dataset download helpers
 train.py         thin entrypoint that builds the selected trainer
 ```
 
+## Documentation
+
+- [Methodology](docs/METHODOLOGY.md)
+- [Datasets](docs/DATASETS.md)
+- [Preprocessing](docs/PREPROCESSING.md)
+- [Training](docs/TRAINING.md)
+
 ## Setup
 
 ```bash
