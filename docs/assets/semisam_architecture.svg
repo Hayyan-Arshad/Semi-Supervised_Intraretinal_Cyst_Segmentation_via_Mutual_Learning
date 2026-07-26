@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="2200" viewBox="0 0 1920 2200" role="img" aria-labelledby="title desc">
+  <title id="title">SemiSAM end-to-end architecture and OCT data pipeline</title>
+  <desc id="desc">Complete patient-wise data preparation, semi-supervised mutual-learning training, validation, and CNN-only inference pipeline.</desc>
+
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#344054"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#16866f"/>
+    </marker>
+    <marker id="arrow-coral" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#d65f4b"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#101828" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      .title { font: 700 52px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #101828; }
+      .subtitle { font: 400 23px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #475467; }
+      .stage { font: 700 25px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #ffffff; letter-spacing: 1px; }
+      .heading { font: 700 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #101828; }
+      .body { font: 500 19px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #344054; }
+      .small { font: 500 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #475467; }
+      .tiny { font: 600 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; fill: #667085; }
+      .formula { font: 600 19px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1d2939; }
+      .white { fill: #ffffff; }
+      .line { fill: none; stroke: #344054; stroke-width: 4; marker-end: url(#arrow); }
+      .line-green { fill: none; stroke: #16866f; stroke-width: 4; marker-end: url(#arrow-green); }
+      .line-coral { fill: none; stroke: #d65f4b; stroke-width: 4; marker-end: url(#arrow-coral); }
+      .dash { fill: none; stroke: #667085; stroke-width: 3; stroke-dasharray: 10 9; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1920" height="2200" fill="#f7f9fc"/>
+  <rect x="0" y="0" width="1920" height="155" fill="#ffffff"/>
+  <rect x="0" y="151" width="1920" height="4" fill="#16866f"/>
+  <text x="80" y="72" class="title">SemiSAM: Semi-Supervised Intraretinal Cyst Segmentation</text>
+  <text x="82" y="116" class="subtitle">End-to-end OCT data pipeline, mutual-learning architecture, and deployment pathway</text>
+
+  <!-- Stage 1 -->
+  <rect x="50" y="195" width="1820" height="300" rx="8" fill="#eaf6f3" stroke="#a7d8cc" stroke-width="2"/>
+  <rect x="50" y="195" width="225" height="48" rx="8" fill="#16866f"/>
+  <text x="75" y="228" class="stage">1  DATA COHORT</text>
+
+  <g filter="url(#shadow)">
+    <rect x="105" y="285" width="300" height="145" rx="8" fill="#ffffff" stroke="#9fcfc3" stroke-width="2"/>
+    <rect x="465" y="285" width="330" height="145" rx="8" fill="#ffffff" stroke="#9fcfc3" stroke-width="2"/>
+    <rect x="855" y="270" width="280" height="175" rx="8" fill="#ffffff" stroke="#16866f" stroke-width="3"/>
+    <rect x="1195" y="285" width="270" height="145" rx="8" fill="#ffffff" stroke="#9fcfc3" stroke-width="2"/>
+    <rect x="1525" y="285" width="270" height="145" rx="8" fill="#ffffff" stroke="#9fcfc3" stroke-width="2"/>
+  </g>
+  <text x="255" y="326" class="heading" text-anchor="middle">Raw OCT Volumes</text>
+  <text x="255" y="360" class="body" text-anchor="middle">B-scans + fluid masks</text>
+  <text x="255" y="392" class="small" text-anchor="middle">Grouped by patient ID</text>
+
+  <text x="630" y="326" class="heading" text-anchor="middle">Patient-wise Partition</text>
+  <text x="630" y="360" class="body" text-anchor="middle">No patient overlap</text>
+  <text x="630" y="392" class="small" text-anchor="middle">Prevents slice leakage</text>
+
+  <text x="995" y="316" class="heading" text-anchor="middle">HDF5 Conversion</text>
+  <text x="995" y="351" class="body" text-anchor="middle">image  [H, W]</text>
+  <text x="995" y="382" class="body" text-anchor="middle">label  [H, W]</text>
+  <text x="995" y="414" class="tiny" text-anchor="middle">Binary cyst / fluid target</text>
+
+  <text x="1330" y="326" class="heading" text-anchor="middle">Training Patients</text>
+  <text x="1330" y="360" class="body" text-anchor="middle">Labeled + unlabeled</text>
+  <text x="1330" y="392" class="small" text-anchor="middle">2D slice files</text>
+
+  <text x="1660" y="326" class="heading" text-anchor="middle">Held-out Patients</text>
+  <text x="1660" y="360" class="body" text-anchor="middle">Validation / test</text>
+  <text x="1660" y="392" class="small" text-anchor="middle">3D volume files</text>
+
+  <path d="M405 357 H455" class="line"/>
+  <path d="M795 357 H845" class="line"/>
+  <path d="M1135 357 H1185" class="line"/>
+  <path d="M1135 357 C1170 357 1170 468 1510 468 C1660 468 1660 450 1660 440" class="line"/>
+
+  <!-- Stage 2 -->
+  <rect x="50" y="535" width="1820" height="305" rx="8" fill="#fff8e8" stroke="#ebcf86" stroke-width="2"/>
+  <rect x="50" y="535" width="255" height="48" rx="8" fill="#b7791f"/>
+  <text x="75" y="568" class="stage">2  INPUT PIPELINE</text>
+
+  <g filter="url(#shadow)">
+    <rect x="105" y="630" width="290" height="145" rx="8" fill="#ffffff" stroke="#e0bd61" stroke-width="2"/>
+    <rect x="455" y="630" width="300" height="145" rx="8" fill="#ffffff" stroke="#e0bd61" stroke-width="2"/>
+    <rect x="815" y="630" width="300" height="145" rx="8" fill="#ffffff" stroke="#e0bd61" stroke-width="2"/>
+    <rect x="1175" y="615" width="300" height="175" rx="8" fill="#ffffff" stroke="#b7791f" stroke-width="3"/>
+    <rect x="1535" y="630" width="260" height="145" rx="8" fill="#ffffff" stroke="#e0bd61" stroke-width="2"/>
+  </g>
+  <text x="250" y="671" class="heading" text-anchor="middle">HDF5 Loader</text>
+  <text x="250" y="705" class="body" text-anchor="middle">Single-channel OCT</text>
+  <text x="250" y="737" class="small" text-anchor="middle">Float image + mask</text>
+
+  <text x="605" y="671" class="heading" text-anchor="middle">Normalization</text>
+  <text x="605" y="705" class="body" text-anchor="middle">Per-slice z-score</text>
+  <text x="605" y="737" class="small" text-anchor="middle">or min-max / clipped z-score</text>
+
+  <text x="965" y="671" class="heading" text-anchor="middle">Augmentation</text>
+  <text x="965" y="705" class="body" text-anchor="middle">Rotation + flip</text>
+  <text x="965" y="737" class="small" text-anchor="middle">Resize to 512 x 512</text>
+
+  <text x="1325" y="657" class="heading" text-anchor="middle">Two-stream Sampler</text>
+  <rect x="1213" y="683" width="100" height="37" rx="5" fill="#dff3ed"/>
+  <rect x="1322" y="683" width="115" height="37" rx="5" fill="#fde7e3"/>
+  <text x="1263" y="708" class="small" text-anchor="middle">B_l labeled</text>
+  <text x="1379" y="708" class="small" text-anchor="middle">B_u unlabeled</text>
+  <text x="1325" y="755" class="small" text-anchor="middle">Mixed semi-supervised batch</text>
+
+  <text x="1665" y="671" class="heading" text-anchor="middle">Batch Tensors</text>
+  <text x="1665" y="705" class="formula" text-anchor="middle">x [B,1,H,W]</text>
+  <text x="1665" y="737" class="formula" text-anchor="middle">y [B,1,H,W]</text>
+
+  <path d="M395 702 H445" class="line"/>
+  <path d="M755 702 H805" class="line"/>
+  <path d="M1115 702 H1165" class="line"/>
+  <path d="M1475 702 H1525" class="line"/>
+
+  <!-- Stage 3 -->
+  <rect x="50" y="880" width="1820" height="800" rx="8" fill="#eef3fb" stroke="#afc5e6" stroke-width="2"/>
+  <rect x="50" y="880" width="405" height="48" rx="8" fill="#315b96"/>
+  <text x="75" y="913" class="stage">3  MUTUAL-LEARNING TRAINING</text>
+
+  <g filter="url(#shadow)">
+    <rect x="105" y="1020" width="250" height="135" rx="8" fill="#ffffff" stroke="#89a9d5" stroke-width="2"/>
+    <rect x="445" y="970" width="400" height="240" rx="8" fill="#e4f5f0" stroke="#16866f" stroke-width="4"/>
+    <rect x="955" y="970" width="390" height="240" rx="8" fill="#fff0ed" stroke="#d65f4b" stroke-width="4"/>
+    <rect x="1455" y="1020" width="340" height="135" rx="8" fill="#ffffff" stroke="#89a9d5" stroke-width="2"/>
+  </g>
+
+  <text x="230" y="1061" class="heading" text-anchor="middle">Mixed Batch</text>
+  <text x="230" y="1095" class="formula" text-anchor="middle">x = x_l + x_u</text>
+  <text x="230" y="1127" class="small" text-anchor="middle">Shared OCT input</text>
+
+  <rect x="445" y="970" width="400" height="55" rx="8" fill="#16866f"/>
+  <text x="645" y="1006" class="stage" text-anchor="middle">BRANCH A  ·  DEPLOYABLE CNN</text>
+  <text x="645" y="1066" class="heading" text-anchor="middle">EfficientNet-B2 U-Net</text>
+  <text x="645" y="1106" class="body" text-anchor="middle">Encoder → skip features → decoder</text>
+  <rect x="530" y="1130" width="230" height="50" rx="6" fill="#ffffff" stroke="#84c9b9" stroke-width="2"/>
+  <text x="645" y="1162" class="formula" text-anchor="middle">z_c [B,1,H,W]</text>
+
+  <rect x="955" y="970" width="390" height="55" rx="8" fill="#d65f4b"/>
+  <text x="1150" y="1006" class="stage" text-anchor="middle">BRANCH B  ·  PROMPT MODEL</text>
+  <text x="1150" y="1066" class="heading" text-anchor="middle">SAM / MedSAM ViT-B</text>
+  <text x="1150" y="1106" class="body" text-anchor="middle">Image + prompt encoders → decoder</text>
+  <rect x="1035" y="1130" width="230" height="50" rx="6" fill="#ffffff" stroke="#e7aaa0" stroke-width="2"/>
+  <text x="1150" y="1162" class="formula" text-anchor="middle">z_p [B,1,H,W]</text>
+
+  <text x="1625" y="1061" class="heading" text-anchor="middle">Ground Truth</text>
+  <text x="1625" y="1095" class="formula" text-anchor="middle">y_l [B_l,1,H,W]</text>
+  <text x="1625" y="1127" class="small" text-anchor="middle">Labeled subset only</text>
+
+  <path d="M355 1088 H435" class="line-green"/>
+  <path d="M355 1088 C395 1088 395 945 900 945 C920 945 920 1088 945 1088" class="line-coral"/>
+
+  <!-- Prompt bridge -->
+  <rect x="650" y="1275" width="490" height="120" rx="8" fill="#ffffff" stroke="#7f8ea3" stroke-width="3" stroke-dasharray="9 7"/>
+  <text x="895" y="1313" class="heading" text-anchor="middle">CNN-Guided Prompt Generator</text>
+  <text x="895" y="1348" class="body" text-anchor="middle">detach → sigmoid → threshold → box + point</text>
+  <text x="895" y="1378" class="tiny" text-anchor="middle">Empty mask: full-image box + negative center point</text>
+  <path d="M645 1210 V1265" class="dash"/>
+  <path d="M1140 1335 H1190 C1230 1335 1230 1220 1150 1220 V1215" class="line-coral"/>
+
+  <!-- Loss row -->
+  <g filter="url(#shadow)">
+    <rect x="190" y="1470" width="360" height="130" rx="8" fill="#ffffff" stroke="#16866f" stroke-width="3"/>
+    <rect x="780" y="1470" width="360" height="130" rx="8" fill="#ffffff" stroke="#7557a6" stroke-width="3"/>
+    <rect x="1370" y="1470" width="360" height="130" rx="8" fill="#ffffff" stroke="#d65f4b" stroke-width="3"/>
+  </g>
+  <text x="370" y="1510" class="heading" text-anchor="middle">CNN Supervision</text>
+  <text x="370" y="1547" class="formula" text-anchor="middle">DiceBCE(z_c_l, y_l)</text>
+  <text x="370" y="1578" class="tiny" text-anchor="middle">Labeled samples only</text>
+
+  <text x="960" y="1510" class="heading" text-anchor="middle">Bidirectional Consistency</text>
+  <text x="960" y="1547" class="formula" text-anchor="middle">Dice(z_c, stop(z_p)) + Dice(z_p, stop(z_c))</text>
+  <text x="960" y="1578" class="tiny" text-anchor="middle">Labeled + unlabeled samples</text>
+
+  <text x="1550" y="1510" class="heading" text-anchor="middle">Prompt Supervision</text>
+  <text x="1550" y="1547" class="formula" text-anchor="middle">DiceBCE(z_p_l, y_l)</text>
+  <text x="1550" y="1578" class="tiny" text-anchor="middle">Labeled samples only</text>
+
+  <path d="M565 1210 C565 1380 370 1380 370 1460" class="line-green"/>
+  <path d="M725 1210 C725 1400 900 1400 900 1460" class="line-green"/>
+  <path d="M1075 1210 C1075 1400 1020 1400 1020 1460" class="line-coral"/>
+  <path d="M1235 1210 C1235 1380 1550 1380 1550 1460" class="line-coral"/>
+  <path d="M1455 1088 C1385 1088 1385 1435 1550 1435 V1460" class="dash"/>
+  <path d="M1455 1088 C1305 1088 1305 1435 370 1435 V1460" class="dash"/>
+
+  <!-- Stage 4 -->
+  <rect x="50" y="1720" width="1820" height="225" rx="8" fill="#f4effa" stroke="#c9b7df" stroke-width="2"/>
+  <rect x="50" y="1720" width="395" height="48" rx="8" fill="#7557a6"/>
+  <text x="75" y="1753" class="stage">4  OPTIMIZATION &amp; VALIDATION</text>
+  <g filter="url(#shadow)">
+    <rect x="130" y="1810" width="430" height="90" rx="8" fill="#ffffff" stroke="#bca7d5" stroke-width="2"/>
+    <rect x="745" y="1810" width="430" height="90" rx="8" fill="#ffffff" stroke="#bca7d5" stroke-width="2"/>
+    <rect x="1360" y="1810" width="430" height="90" rx="8" fill="#ffffff" stroke="#bca7d5" stroke-width="2"/>
+  </g>
+  <text x="345" y="1846" class="heading" text-anchor="middle">Total Objective</text>
+  <text x="345" y="1880" class="formula" text-anchor="middle">L_sup + lambda(t) L_mutual</text>
+  <text x="960" y="1846" class="heading" text-anchor="middle">Joint Adam Update</text>
+  <text x="960" y="1880" class="small" text-anchor="middle">Warmup + sigmoid ramp + polynomial LR</text>
+  <text x="1575" y="1846" class="heading" text-anchor="middle">Patient-wise Validation</text>
+  <text x="1575" y="1880" class="small" text-anchor="middle">CNN Dice → best checkpoint</text>
+  <path d="M560 1855 H735" class="line"/>
+  <path d="M1175 1855 H1350" class="line"/>
+
+  <!-- Stage 5 -->
+  <rect x="50" y="1985" width="1820" height="165" rx="8" fill="#eaf6f3" stroke="#a7d8cc" stroke-width="2"/>
+  <rect x="50" y="1985" width="250" height="48" rx="8" fill="#16866f"/>
+  <text x="75" y="2018" class="stage">5  DEPLOYMENT</text>
+  <rect x="365" y="2032" width="300" height="76" rx="8" fill="#ffffff" stroke="#7bc2b1" stroke-width="2"/>
+  <rect x="810" y="2032" width="300" height="76" rx="8" fill="#ffffff" stroke="#16866f" stroke-width="3"/>
+  <rect x="1255" y="2032" width="300" height="76" rx="8" fill="#ffffff" stroke="#7bc2b1" stroke-width="2"/>
+  <text x="515" y="2064" class="heading" text-anchor="middle">Unseen OCT B-scan</text>
+  <text x="515" y="2092" class="tiny" text-anchor="middle">Same intensity normalization</text>
+  <text x="960" y="2064" class="heading" text-anchor="middle">Trained CNN Only</text>
+  <text x="960" y="2092" class="tiny" text-anchor="middle">SAM and prompts removed</text>
+  <text x="1405" y="2064" class="heading" text-anchor="middle">Cyst Probability Mask</text>
+  <text x="1405" y="2092" class="tiny" text-anchor="middle">Thresholded segmentation output</text>
+  <path d="M665 2070 H800" class="line-green"/>
+  <path d="M1110 2070 H1245" class="line-green"/>
+</svg>
