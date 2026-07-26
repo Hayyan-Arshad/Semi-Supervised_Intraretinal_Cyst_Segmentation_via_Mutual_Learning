@@ -50,6 +50,23 @@ Download a SAM or MedSAM ViT-B checkpoint separately and pass it with `--sam_che
 
 ```bash
 python train.py \
+  --config code/configs/semisam_oct.yaml
+```
+
+Values supplied explicitly on the command line override the YAML configuration. For example:
+
+```bash
+python train.py \
+  --config code/configs/semisam_oct.yaml \
+  --root_path data/OCT_IRF \
+  --sam_checkpoint checkpoints/sam_vit_b_01ec64.pth \
+  --batch_size 6
+```
+
+The same experiment can be specified entirely through command-line options:
+
+```bash
+python train.py \
   --trainer semisam \
   --dataset oct_h5 \
   --cnn_model efficient_unet \
@@ -79,7 +96,7 @@ Useful switches:
 - `--val_every`: validation interval.
 - `--num_workers`: data-loading workers. Use `0` for debugging on macOS or notebooks.
 
-The reference defaults are documented in [code/configs/semisam_oct.yaml](code/configs/semisam_oct.yaml).
+The loadable reference experiment is defined in [code/configs/semisam_oct.yaml](code/configs/semisam_oct.yaml).
 
 ## Swapping Components
 
@@ -121,6 +138,7 @@ The first `--labeled_num` entries in `train_slices.list` are treated as labeled.
 
 ```bash
 python -m py_compile train.py code/**/*.py
+python -m code.tests.test_config
 python -m code.tests.smoke_train
 ```
 

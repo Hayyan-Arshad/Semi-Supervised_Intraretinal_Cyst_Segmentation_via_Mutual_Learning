@@ -53,6 +53,8 @@ def main():
     root = make_tiny_h5_dataset()
     args = parse_args(
         [
+            "--config",
+            "code/configs/semisam_oct.yaml",
             "--root_path",
             str(root),
             "--sam_checkpoint",
@@ -88,4 +90,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

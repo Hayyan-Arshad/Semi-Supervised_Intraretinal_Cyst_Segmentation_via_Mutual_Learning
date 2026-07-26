@@ -14,6 +14,24 @@ Download a SAM or MedSAM ViT-B checkpoint separately and provide its path with `
 
 ```bash
 python train.py \
+  --config code/configs/semisam_oct.yaml
+```
+
+The YAML file defines the complete reference experiment. Explicit command-line arguments take precedence, which makes controlled variants concise:
+
+```bash
+python train.py \
+  --config code/configs/semisam_oct.yaml \
+  --root_path data/OCT_IRF \
+  --sam_checkpoint checkpoints/sam_vit_b_01ec64.pth \
+  --labeled_num 40 \
+  --exp SemiSAM_40L
+```
+
+An experiment can also be specified entirely through command-line arguments:
+
+```bash
+python train.py \
   --trainer semisam \
   --dataset oct_h5 \
   --root_path data/OCT_IRF \
@@ -38,6 +56,7 @@ python train.py \
 
 ## Key Parameters
 
+- `config`: YAML experiment configuration. Command-line values override matching YAML values.
 - `trainer`: training algorithm. Default: `semisam`.
 - `dataset`: dataset loader. Default: `oct_h5`.
 - `intensity_norm`: image normalization mode.
@@ -54,11 +73,12 @@ python train.py \
 Lightweight checks are provided for development:
 
 ```bash
+python -m code.tests.test_config
 python -m code.tests.test_normalization
 python -m code.tests.smoke_train
 ```
 
-These checks validate preprocessing and trainer wiring without requiring protected datasets.
+These checks validate YAML loading and overrides, preprocessing, and trainer wiring without requiring protected datasets.
 
 ## Outputs
 
@@ -77,4 +97,3 @@ Typical outputs include:
 - `cnn_best.pth`
 
 The `model/` directory is ignored by Git.
-

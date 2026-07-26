@@ -1,6 +1,7 @@
 torch
 torchvision
 numpy
+PyYAML
 scipy
 h5py
 medpy

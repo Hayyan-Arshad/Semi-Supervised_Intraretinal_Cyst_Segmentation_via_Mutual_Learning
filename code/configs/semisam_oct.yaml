@@ -1,6 +1,6 @@
-# Reference configuration for the default OCT SemiSAM experiment.
-# The current entrypoint uses argparse; this file documents the same knobs
-# in a stable place for experiment tracking.
+# Default OCT SemiSAM experiment.
+# Load with: python train.py --config code/configs/semisam_oct.yaml
+# Explicit command-line options override values in this file.
 
 trainer: semisam
 dataset: oct_h5
