@@ -1,0 +1,40 @@
+# Reference configuration for the default OCT SemiSAM experiment.
+# The current entrypoint uses argparse; this file documents the same knobs
+# in a stable place for experiment tracking.
+
+trainer: semisam
+dataset: oct_h5
+root_path: data/OCT_IRF
+exp: SemiSAM_EffiB2
+snapshot_path: model
+
+cnn_model: efficient_unet
+encoder_name: efficientnet-b2
+encoder_weights: imagenet
+in_channels: 1
+out_channels: 1
+
+prompt_model: sam
+sam_model_type: vit_b
+sam_checkpoint: checkpoints/sam_vit_b_01ec64.pth
+sam_freeze_image_encoder: false
+prompt_generator: mask_box_point
+prompt_threshold: 0.5
+prompt_margin: 4
+
+max_iterations: 30000
+batch_size: 9
+labeled_bs: 6
+labeled_num: 85
+base_lr: 0.0001
+prompt_lr: 0.00001
+patch_size: [512, 512]
+seed: 1337
+consistency: 1.0
+consistency_rampup: 200.0
+warmup_iterations: 1000
+save_every: 3000
+val_every: 200
+num_workers: 4
+device: auto
+

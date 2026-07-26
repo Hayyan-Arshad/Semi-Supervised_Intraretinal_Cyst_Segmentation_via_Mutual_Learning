@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+*.egg-info/
 
 # Keep datasets and bulky artifacts local.
 data/
@@ -13,6 +14,7 @@ checkpoints/
 model/
 runs/
 logs/
+tmp/
 *.h5
 *.hdf5
 *.mat
@@ -21,4 +23,3 @@ logs/
 *.pth
 *.pt
 *.ckpt
-

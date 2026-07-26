@@ -12,14 +12,7 @@ from torch.utils.data.sampler import Sampler
 
 
 class OCTH5Dataset(Dataset):
-    """SSL4MIS-style HDF5 dataset.
-
-    Expected layout:
-      root/train_slices.list -> names stored at root/data/slices/{name}.h5
-      root/val.list          -> names stored at root/data/{name}.h5
-
-    Each HDF5 file should contain `image` and `label` arrays.
-    """
+    """SSL4MIS-style HDF5 dataset for OCT segmentation."""
 
     def __init__(self, root, split="train", transform=None, max_samples=None):
         self.root = Path(root)
@@ -87,6 +80,8 @@ class RandomGenerator:
 
 
 class TwoStreamBatchSampler(Sampler):
+    """Iterate labeled and unlabeled indices in each batch."""
+
     def __init__(self, primary_indices, secondary_indices, batch_size, secondary_batch_size):
         self.primary_indices = primary_indices
         self.secondary_indices = secondary_indices
