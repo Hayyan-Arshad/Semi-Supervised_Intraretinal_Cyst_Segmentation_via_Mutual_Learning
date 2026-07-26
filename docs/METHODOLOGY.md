@@ -1,104 +1,79 @@
 # Methodology
 
-This project implements a semi-supervised mutual-learning pipeline for intraretinal cyst/fluid segmentation in OCT B-scans.
+This project studies semi-supervised intraretinal cyst/fluid segmentation in OCT B-scans through mutual learning between a compact convolutional segmentation model and a promptable foundation model.
 
 ## Objective
 
-The goal is to train a deployable OCT cyst segmentation model using a small labeled set and a larger unlabeled set. The training stage uses two branches:
+The objective is to learn a deployable OCT segmentation model from limited labeled data while leveraging additional unlabeled scans. During training, predictions from a CNN branch and a SAM/MedSAM branch regularize one another. During inference, only the CNN branch is required, keeping deployment lightweight.
 
-- A CNN segmentation branch based on EfficientNet-B2 U-Net.
-- A promptable SAM/MedSAM branch guided by prompts generated from the CNN prediction.
+## Model Architecture
 
-At inference time, only the CNN branch is needed.
+### CNN Segmentation Branch
 
-## Architecture
+The primary segmentation branch is an EfficientNet-B2 U-Net implemented with `segmentation-models-pytorch`. It accepts single-channel OCT B-scans and outputs a binary foreground logit map for cyst/fluid segmentation.
 
-### CNN Branch
-
-The default CNN is an EfficientNet-B2 U-Net implemented through `segmentation-models-pytorch`.
-
-Code:
+Relevant modules:
 
 - `code/networks/efficient_unet.py`
 - `code/networks/net_factory.py`
 
-Default settings:
+Default configuration:
 
-- `--cnn_model efficient_unet`
-- `--encoder_name efficientnet-b2`
-- `--in_channels 1`
-- `--out_channels 1`
+```text
+cnn_model: efficient_unet
+encoder_name: efficientnet-b2
+in_channels: 1
+out_channels: 1
+```
 
-The CNN outputs one foreground logit map for binary cyst/fluid segmentation.
+### Promptable SAM/MedSAM Branch
 
-### SAM/MedSAM Branch
+The second branch wraps SAM or MedSAM ViT-B. OCT slices are adapted to the expected SAM input format, encoded by the image encoder, and decoded using prompts derived from the CNN prediction.
 
-The promptable branch wraps Meta SAM or MedSAM ViT-B checkpoints. OCT slices are converted from one channel to three channels, resized to SAM input size, and passed through SAM image encoder, prompt encoder, and mask decoder.
-
-Code:
+Relevant modules:
 
 - `code/networks/sam_adapter.py`
 - `code/networks/net_factory.py`
 
-Default settings:
+Default configuration:
 
-- `--prompt_model sam`
-- `--sam_model_type vit_b`
-- `--sam_checkpoint <path-to-sam-or-medsam-checkpoint>`
-
-The SAM image encoder can be frozen with:
-
-```bash
---sam_freeze_image_encoder
+```text
+prompt_model: sam
+sam_model_type: vit_b
 ```
+
+The SAM image encoder can optionally be frozen to reduce training cost and stabilize optimization.
 
 ## Prompt Generation
 
-The CNN prediction is converted into SAM prompts.
+The CNN branch provides weak spatial guidance for the promptable branch. Its foreground probability map is thresholded, converted into a bounding box, and paired with a positive point sampled from the predicted foreground. If no foreground is detected, the full image box and a negative center point are used.
 
-Code:
+Relevant modules:
 
 - `code/prompts/mask_prompts.py`
 - `code/prompts/factory.py`
 
-Current prompt strategy:
+Default configuration:
 
-- Threshold CNN foreground probability.
-- Find the foreground bounding box.
-- Add a small configurable margin.
-- Sample one positive point inside the predicted foreground.
-- If no foreground exists, use the full image box and a negative center point.
+```text
+prompt_generator: mask_box_point
+prompt_threshold: 0.5
+prompt_margin: 4
+```
 
-Default settings:
+## Training Loss
 
-- `--prompt_generator mask_box_point`
-- `--prompt_threshold 0.5`
-- `--prompt_margin 4`
+### Supervised Segmentation Loss
 
-## Losses
-
-Code:
-
-- `code/utils/losses.py`
-- `code/trainers/semisam_trainer.py`
-
-### Supervised Loss
-
-For labeled samples, both branches receive supervised segmentation loss:
+For labeled samples, both branches are trained with Dice loss and binary cross-entropy with logits:
 
 ```text
 L_sup = 0.5 * (L_cnn_sup + L_prompt_sup)
 ```
 
-Each branch uses:
-
-```text
-Dice loss + BCEWithLogits loss
-```
-
 ### Mutual Consistency Loss
 
-For labeled and unlabeled samples, the CNN and SAM/MedSAM predictions are encouraged to agree:
+For both labeled and unlabeled samples, the two branches are encouraged to agree:
 
 ```text
 L_mutual = 0.5 * (
@@ -107,61 +82,47 @@ L_mutual = 0.5 * (
 )
 ```
 
-The total loss is:
+The final objective is:
 
 ```text
 L_total = L_sup + w(t) * L_mutual
 ```
 
-The consistency weight is zero during warmup, then ramps up using a sigmoid ramp:
+where `w(t)` is a sigmoid ramp-up schedule. This delays the consistency objective until the supervised signal has begun to shape stable predictions.
 
-```bash
---warmup_iterations 1000
---consistency 1.0
---consistency_rampup 200
+Default configuration:
+
+```text
+warmup_iterations: 1000
+consistency: 1.0
+consistency_rampup: 200
 ```
 
 ## Semi-Supervised Sampling
 
-Training uses a two-stream batch sampler:
+Training batches are formed with a two-stream sampler. The first `labeled_num` samples in `train_slices.list` are treated as labeled, and remaining samples are treated as unlabeled. Each batch contains `labeled_bs` labeled examples, with the rest drawn from the unlabeled pool.
 
-- First `--labeled_num` entries in `train_slices.list` are treated as labeled.
-- Remaining training entries are treated as unlabeled.
-- Each batch contains `--labeled_bs` labeled samples and the rest unlabeled samples.
-
-Code:
+Relevant modules:
 
 - `code/dataloaders/oct_h5.py`
 - `code/trainers/semisam_trainer.py`
 
-## Inference
+## Preprocessing and Augmentation
 
-The intended inference path uses only the CNN branch. SAM/MedSAM is a training-time mutual-learning teacher/peer branch and is not required for deployment.
+OCT images are intensity-normalized in the dataloader. Available modes are:
 
-An inference script is not yet implemented. It should load `cnn_best.pth` or another CNN checkpoint and run only the EfficientNet U-Net model on preprocessed OCT slices/volumes.
+```text
+none
+minmax
+zscore
+clip_zscore
+```
 
-## Current Implementation Status
+The default is z-score normalization. Training-time augmentation includes random rotation, random flip, and resizing to the configured patch size. Validation and test samples are not augmented.
 
-Implemented:
+## Inference Protocol
 
-- Modular SSL4MIS-style project layout.
-- EfficientNet U-Net branch.
-- SAM/MedSAM prompt branch.
-- Mask-to-box/point prompt generation.
-- Dice + BCE supervised loss.
-- Mutual consistency loss.
-- Consistency ramp-up.
-- Two-stream labeled/unlabeled sampler.
-- Configurable intensity normalization.
-- Rotation/flip augmentation.
-- Synthetic smoke test.
-- One-iteration real training-path test with Duke OCT and SAM ViT-B checkpoint.
+The inference protocol uses the CNN branch only. The promptable SAM/MedSAM branch is used during training as a mutual-learning signal and is not required for deployment.
 
-Still needed before serious experiments:
-
-- Patient-wise data preparation script.
-- Proper train/validation/test split files.
-- Full RETOUCH/OPTIMA conversion if access is available.
-- Inference/evaluation script.
-- Experiment logging table for final paper-style results.
+This design keeps the deployed model efficient while still benefiting from promptable foundation-model supervision during training.
 

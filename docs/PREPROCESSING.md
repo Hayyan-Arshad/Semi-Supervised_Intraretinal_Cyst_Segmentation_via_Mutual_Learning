@@ -1,35 +1,33 @@
 # Preprocessing
 
-## Implemented
+Preprocessing is applied consistently through the OCT HDF5 dataloader.
 
-Preprocessing currently happens in the dataloader:
-
-Code:
+Relevant module:
 
 - `code/dataloaders/oct_h5.py`
 
-Implemented image intensity options:
+## Intensity Normalization
 
-```bash
---intensity_norm none
---intensity_norm minmax
---intensity_norm zscore
---intensity_norm clip_zscore
+The dataloader supports four image normalization modes:
+
+```text
+none
+minmax
+zscore
+clip_zscore
 ```
 
 Default:
 
-```bash
---intensity_norm zscore
+```text
+intensity_norm: zscore
 ```
 
-Labels are not intensity-normalized.
-
-## Normalization Modes
+Labels are treated as binary masks and are not intensity-normalized.
 
 ### none
 
-Converts image to `float32` and leaves values unchanged.
+Converts images to `float32` and leaves intensity values unchanged.
 
 ### minmax
 
@@ -49,24 +47,28 @@ Standardizes each loaded image or volume:
 
 ### clip_zscore
 
-Applies z-score normalization, clips to `[-5, 5]`, then scales to approximately `[-1, 1]`.
+Applies z-score normalization, clips values to `[-5, 5]`, and rescales to approximately `[-1, 1]`.
 
-## Augmentation
+## Spatial Processing
 
-Training augmentation currently includes:
+All training images and labels are resized to the configured patch size:
+
+```text
+patch_size: [512, 512]
+```
+
+Validation and test volumes are evaluated slice by slice and resized internally for model inference.
+
+## Data Augmentation
+
+Training-time augmentation includes:
 
 - Random rotation and flip.
-- Random rotation from approximately `-20` to `+20` degrees.
-- Resize to `--patch_size`.
+- Random in-plane rotation between approximately `-20` and `+20` degrees.
 
-Validation/test samples are not augmented.
+Augmentation is applied only to training samples. Validation and test data are not augmented.
 
-## Important Caveats
+## Mask Handling
 
-The current transform uses nearest-neighbor resizing for both image and label. That is safe for labels but not ideal for OCT images. A future improvement should use:
-
-- bilinear interpolation for images.
-- nearest-neighbor interpolation for labels.
-
-The repo now supports normalization, but it does not yet include a full raw-dataset conversion pipeline. Patient-wise preprocessing should be implemented in a separate preparation script.
+Segmentation masks are represented as binary foreground/background labels. Foreground values greater than zero are treated as cyst/fluid during training.
 

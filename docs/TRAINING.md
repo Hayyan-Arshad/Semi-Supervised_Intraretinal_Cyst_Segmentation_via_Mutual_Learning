@@ -1,17 +1,16 @@
 # Training
 
-## Quick Smoke Test
+## Environment
 
 ```bash
-python -m code.tests.test_normalization
-python -m code.tests.smoke_train
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-The smoke trainer uses synthetic HDF5 data and tiny mock models. It does not require real OCT data or SAM checkpoints.
+Download a SAM or MedSAM ViT-B checkpoint separately and provide its path with `--sam_checkpoint`.
 
-## Real Training Command
-
-Example:
+## Training Command
 
 ```bash
 python train.py \
@@ -37,30 +36,29 @@ python train.py \
   --num_workers 4
 ```
 
-## CPU Sanity Run
+## Key Parameters
 
-A one-iteration CPU run with SAM ViT-B is slow but useful for verifying the real code path:
+- `trainer`: training algorithm. Default: `semisam`.
+- `dataset`: dataset loader. Default: `oct_h5`.
+- `intensity_norm`: image normalization mode.
+- `cnn_model`: CNN segmentation branch.
+- `encoder_name`: CNN encoder backbone.
+- `prompt_model`: SAM/MedSAM promptable branch.
+- `labeled_num`: number of labeled training entries.
+- `labeled_bs`: number of labeled samples per batch.
+- `warmup_iterations`: iterations before consistency regularization begins.
+- `consistency`: maximum consistency-loss weight.
+
+## Verification
+
+Lightweight checks are provided for development:
 
 ```bash
-python train.py \
-  --root_path data/DUKE_TINY \
-  --intensity_norm zscore \
-  --sam_checkpoint /Users/hayyan/SSL4MIS/code/pretrained_ckpt/sam_vit_b_01ec64.pth \
-  --encoder_weights None \
-  --batch_size 2 \
-  --labeled_bs 1 \
-  --labeled_num 2 \
-  --patch_size 64 64 \
-  --max_iterations 1 \
-  --num_workers 0 \
-  --val_every 999999 \
-  --save_every 999999 \
-  --sam_freeze_image_encoder \
-  --snapshot_path model \
-  --exp duke_tiny_real_cpu_norm
+python -m code.tests.test_normalization
+python -m code.tests.smoke_train
 ```
 
-This was used only to verify execution. It is not a valid experiment split.
+These checks validate preprocessing and trainer wiring without requiring protected datasets.
 
 ## Outputs
 
@@ -70,7 +68,7 @@ Training outputs are written under:
 model/<exp>/
 ```
 
-Typical files:
+Typical outputs include:
 
 - `log.txt`
 - TensorBoard event files.
@@ -78,5 +76,5 @@ Typical files:
 - `prompt_iter_<n>.pth`
 - `cnn_best.pth`
 
-The `model/` folder is ignored by Git.
+The `model/` directory is ignored by Git.
 

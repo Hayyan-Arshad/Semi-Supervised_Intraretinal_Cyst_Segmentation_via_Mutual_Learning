@@ -78,7 +78,7 @@ Useful switches:
 - `--val_every`: validation interval.
 - `--num_workers`: data-loading workers. Use `0` for debugging on macOS or notebooks.
 
-The reference defaults are documented in [code/configs/semisam_oct.yaml](/Users/hayyan/Documents/SSL/intraretinal-cyst-semisam/code/configs/semisam_oct.yaml).
+The reference defaults are documented in [code/configs/semisam_oct.yaml](code/configs/semisam_oct.yaml).
 
 ## Swapping Components
 
@@ -116,18 +116,18 @@ Labels are not intensity-normalized.
 
 The first `--labeled_num` entries in `train_slices.list` are treated as labeled. Remaining entries are treated as unlabeled and contribute only to consistency loss.
 
-## Verify
+## Verification
 
 ```bash
 python -m py_compile train.py code/**/*.py
 python -m code.tests.smoke_train
 ```
 
-The smoke test uses tiny synthetic HDF5 data and tiny mock models, so it verifies the modular trainer without requiring real OCT data or SAM weights.
+The smoke test verifies trainer wiring without requiring protected datasets or SAM weights.
 
 ## OCT Dataset Notes
 
-Datasets checked/downloaded locally during setup:
+Supported dataset sources:
 
 - Duke DME / Chiu BOE 2014: publicly downloadable OCT volumes with layer/cyst annotations in `.mat` files.
 - Kermany OCT 2017 mirror on Hugging Face: classification OCT images in parquet shards. Useful for unlabeled SSL or pretraining, but it does not provide cyst segmentation masks.
@@ -137,7 +137,7 @@ Datasets that need manual access:
 - RETOUCH: relevant for intraretinal fluid/cyst segmentation, but access requires registration/data-agreement steps.
 - OPTIMA cyst segmentation data: referenced by the paper, but a direct public bulk download link was not available from the public page scan.
 
-## Local Dataset Helpers
+## Dataset Helpers
 
 ```bash
 bash scripts/download_duke_dme.sh
