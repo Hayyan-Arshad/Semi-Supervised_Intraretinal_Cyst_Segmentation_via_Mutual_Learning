@@ -86,6 +86,6 @@ with gr.Blocks(title="SemiSAM OCT Segmentation", css=CSS, theme=gr.themes.Soft()
 if __name__ == "__main__":
     demo.launch(
         server_name=os.getenv("GRADIO_SERVER_NAME", "0.0.0.0"),
-        server_port=int(os.getenv("PORT", "7860")),
+        server_port=int(os.getenv("PORT", "10000")),
         show_api=False,
     )

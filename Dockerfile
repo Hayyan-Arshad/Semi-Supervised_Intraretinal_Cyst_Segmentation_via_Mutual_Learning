@@ -9,7 +9,7 @@ COPY . .
 
 ENV MODEL_CHECKPOINT=/app/checkpoints/cnn_best.pth
 ENV MODEL_DEVICE=cpu
-ENV PORT=7860
+ENV PORT=10000
 
-EXPOSE 7860
+EXPOSE 10000
 CMD ["python", "app.py"]

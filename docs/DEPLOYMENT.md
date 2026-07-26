@@ -8,7 +8,7 @@ Place the trained checkpoint at `checkpoints/cnn_best.pth`, then run:
 
 ```bash
 pip install -r requirements.txt
-python app.py
+PORT=7860 python app.py
 ```
 
 Open `http://localhost:7860` in a browser. A different checkpoint can be selected with `MODEL_CHECKPOINT`:
@@ -33,6 +33,6 @@ For a private checkpoint, keep the repository public and attach the model throug
 | `MODEL_ENCODER_NAME` | `efficientnet-b2` | Encoder used during training |
 | `MODEL_INTENSITY_NORM` | `zscore` | Input normalization mode |
 | `MODEL_DEVICE` | `auto` | `cpu`, `cuda`, or automatic selection |
-| `PORT` | `7860` | Web server port |
+| `PORT` | `10000` in hosted Docker, `7860` for local use | Web server port |
 
 The serving checkpoint must match the encoder and output-channel configuration used during training.
