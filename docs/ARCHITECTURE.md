@@ -1,190 +1,177 @@
-# SemiSAM Architecture
+```mermaid
+flowchart TB
+    RAW["Raw OCT volumes<br/>B-scans and cyst/fluid masks"] --> PID["Group volumes by patient ID"]
+    PID --> SPLIT{"Patient-wise split<br/>No patient overlap"}
 
-## Overview
+    SPLIT --> TRAIN["Training patients"]
+    SPLIT --> VAL["Validation patients"]
+    SPLIT --> TEST["Test patients"]
 
-SemiSAM is a dual-branch semi-supervised segmentation architecture for intraretinal cyst and fluid delineation in OCT B-scans. It combines a deployable convolutional model with a promptable foundation model during training. The two branches learn from labeled scans and regularize one another on both labeled and unlabeled scans. Only the convolutional branch is retained for inference.
+    subgraph TRAIN_DATA["Training dataset preparation"]
+        direction TB
+        TRAIN --> TSLICES["Extract 2D OCT slices"]
+        TSLICES --> TH5["Write one HDF5 file per slice<br/>image H x W | label H x W"]
+        TH5 --> TLIST["train_slices.list"]
+        TLIST --> LABEL_SPLIT{"Annotation availability"}
+        LABEL_SPLIT --> LABELED["Labeled slice pool D_l"]
+        LABEL_SPLIT --> UNLABELED["Unlabeled slice pool D_u"]
+    end
+
+    subgraph VAL_DATA["Validation dataset preparation"]
+        direction TB
+        VAL --> VH5["Write patient HDF5 volumes<br/>image D x H x W | label D x H x W"]
+        VH5 --> VLIST["val.list"]
+    end
+
+    subgraph TEST_DATA["Test dataset preparation"]
+        direction TB
+        TEST --> EH5["Write patient HDF5 volumes<br/>image D x H x W | label D x H x W"]
+        EH5 --> ELIST["test.list"]
+    end
+
+    classDef source fill:#eef4ff,stroke:#315b96,stroke-width:2px,color:#101828;
+    classDef process fill:#ffffff,stroke:#667085,stroke-width:2px,color:#101828;
+    classDef labeled fill:#e7f6f1,stroke:#16866f,stroke-width:2px,color:#101828;
+    classDef unlabeled fill:#fff0ed,stroke:#d65f4b,stroke-width:2px,color:#101828;
+    class RAW,PID,SPLIT source;
+    class TRAIN,VAL,TEST,TSLICES,TH5,TLIST,LABEL_SPLIT,VH5,VLIST,EH5,ELIST process;
+    class LABELED labeled;
+    class UNLABELED unlabeled;
+```
 
 ```mermaid
-flowchart LR
-    X["OCT B-scan x"] --> N["Intensity normalization and augmentation"]
-    N --> C["EfficientNet-B2 U-Net"]
-    C --> YC["CNN logits z_c"]
-    YC --> P["Detach, sigmoid, and threshold"]
-    P --> G["Box and point prompt generator"]
-    N --> A["Single-channel to three-channel SAM input"]
-    G --> S["SAM or MedSAM ViT-B"]
-    A --> S
-    S --> YS["Prompt-branch logits z_p"]
-    YC --> LC["Supervised Dice and BCE"]
-    YS --> LP["Supervised Dice and BCE"]
-    YC --> M["Bidirectional mutual Dice consistency"]
-    YS --> M
-    LC --> L["Total objective"]
-    LP --> L
-    M --> L
-    L --> U["Joint parameter update"]
+flowchart TB
+    DL["Labeled pool D_l"] --> SAMPLER["Two-stream batch sampler"]
+    DU["Unlabeled pool D_u"] --> SAMPLER
+    SAMPLER --> MIXED["Mixed batch<br/>B_l labeled + B_u unlabeled"]
+    MIXED --> LOAD["Load image and binary mask from HDF5"]
+    LOAD --> NORM["OCT intensity normalization<br/>z-score | min-max | clipped z-score"]
+    NORM --> AUG["Training augmentation<br/>random rotation + flip + resize"]
+    AUG --> X["OCT tensor x<br/>B x 1 x H x W"]
+    LOAD --> Y["Ground-truth tensor y_l<br/>B_l x 1 x H x W"]
+
+    subgraph CNN_BRANCH["Branch A: deployable CNN"]
+        direction TB
+        X --> CNN["EfficientNet-B2 U-Net"]
+        CNN --> ZC["CNN logits z_c<br/>B x 1 x H x W"]
+        ZC --> PC["CNN probabilities<br/>sigmoid z_c"]
+    end
+
+    subgraph PROMPT_PIPELINE["CNN-guided prompt pipeline"]
+        direction TB
+        PC --> DETACH["Stop gradient"]
+        DETACH --> THRESH["Threshold foreground probability"]
+        THRESH --> EMPTY{"Foreground present?"}
+        EMPTY -->|Yes| BOX["Tight bounding box + margin"]
+        EMPTY -->|Yes| POINT["Sample positive foreground point"]
+        EMPTY -->|No| FULLBOX["Full-image bounding box"]
+        EMPTY -->|No| NEGPOINT["Negative center point"]
+        BOX --> PROMPTS["Box + point prompts"]
+        POINT --> PROMPTS
+        FULLBOX --> PROMPTS
+        NEGPOINT --> PROMPTS
+    end
+
+    subgraph SAM_INPUT["Prompt-model image preparation"]
+        direction TB
+        X --> RGB["Repeat OCT channel 1 to 3"]
+        RGB --> RESIZE["Resize to SAM encoder resolution"]
+        RESIZE --> PREP["SAM preprocessing"]
+    end
+
+    subgraph SAM_BRANCH["Branch B: promptable model"]
+        direction TB
+        PREP --> IMAGE_ENCODER["SAM / MedSAM ViT-B image encoder"]
+        PROMPTS --> PROMPT_ENCODER["Prompt encoder"]
+        IMAGE_ENCODER --> MASK_DECODER["Mask decoder"]
+        PROMPT_ENCODER --> MASK_DECODER
+        MASK_DECODER --> UPSAMPLE["Upsample to OCT resolution"]
+        UPSAMPLE --> ZP["Prompt-model logits z_p<br/>B x 1 x H x W"]
+    end
+
+    classDef data fill:#eef4ff,stroke:#315b96,stroke-width:2px,color:#101828;
+    classDef cnn fill:#e7f6f1,stroke:#16866f,stroke-width:2px,color:#101828;
+    classDef prompt fill:#fff0ed,stroke:#d65f4b,stroke-width:2px,color:#101828;
+    classDef process fill:#ffffff,stroke:#667085,stroke-width:2px,color:#101828;
+    class DL,DU,SAMPLER,MIXED,LOAD,NORM,AUG,X,Y data;
+    class CNN,ZC,PC cnn;
+    class IMAGE_ENCODER,PROMPT_ENCODER,MASK_DECODER,UPSAMPLE,ZP prompt;
+    class DETACH,THRESH,EMPTY,BOX,POINT,FULLBOX,NEGPOINT,PROMPTS,RGB,RESIZE,PREP process;
 ```
-
-## Input and Output Contract
-
-For a batch of OCT B-scans, the training tensors follow this contract:
-
-```text
-images:        [B, 1, H, W] float32
-labels:        [B, 1, H, W] binary
-cnn_logits:    [B, 1, H, W]
-prompt_logits: [B, 1, H, W]
-boxes:         [B, 4]        in (x_min, y_min, x_max, y_max) format
-points:        [B, 2]        in (x, y) format
-point_labels:  [B]           1 for foreground, 0 for background
-```
-
-Each training batch contains `B_l` labeled samples and `B - B_l` unlabeled samples. The labeled samples occupy the first `B_l` positions so supervised losses can be applied by slicing the batch. Both groups participate in mutual consistency learning.
-
-## Branch A: EfficientNet U-Net
-
-The primary branch is a U-Net with an EfficientNet-B2 encoder. It receives a normalized single-channel B-scan and produces one foreground logit per pixel:
-
-```text
-z_c = f_cnn(x; theta_c)
-p_c = sigmoid(z_c)
-```
-
-The encoder can be initialized with ImageNet weights. This branch is the final deployable model and is used independently at inference time.
-
-Implementation: `code/networks/efficient_unet.py`
-
-## CNN-Guided Prompt Construction
-
-The prompt generator converts the CNN probability mask into spatial guidance for the promptable branch:
-
-1. Detach `p_c` from the computation graph.
-2. Threshold it at `tau` to obtain a binary foreground proposal.
-3. Compute the tight bounding box around all foreground pixels.
-4. Expand the box by a configurable margin and clip it to the image boundary.
-5. Sample one positive point from the proposed foreground.
-
-If the CNN predicts no foreground, the full image is used as the box and the image center is supplied as a negative point. Detachment deliberately prevents gradients from passing through the non-differentiable thresholding and coordinate extraction operations.
-
-Implementation: `code/prompts/mask_prompts.py`
-
-## Branch B: SAM or MedSAM
-
-The promptable branch receives the same OCT image together with the generated box and point:
-
-```text
-z_p = f_prompt(x, box(p_c), point(p_c); theta_p)
-p_p = sigmoid(z_p)
-```
-
-Before encoding, the OCT channel is repeated three times, resized to the SAM image-encoder resolution, and normalized by the SAM preprocessing routine. Prompt coordinates are scaled to the resized image. The mask decoder output is then upsampled to the original training resolution.
-
-The SAM image encoder may be frozen while the prompt encoder and mask decoder remain trainable. This reduces memory and computation while preserving the prompt-guided learning signal.
-
-Implementation: `code/networks/sam_adapter.py`
-
-## Learning Objective
-
-### Supervised Segmentation
-
-Ground-truth supervision is applied only to the labeled subset. Each branch uses the sum of soft Dice loss and binary cross-entropy with logits:
-
-```text
-L_cnn_sup    = DiceBCE(z_c[0:B_l], y[0:B_l])
-L_prompt_sup = DiceBCE(z_p[0:B_l], y[0:B_l])
-L_sup        = 0.5 * (L_cnn_sup + L_prompt_sup)
-```
-
-### Mutual Consistency
-
-All samples contribute to a bidirectional consistency objective:
-
-```text
-L_cnn<-prompt = Dice(z_c, stopgrad(z_p))
-L_prompt<-cnn = Dice(z_p, stopgrad(z_c))
-L_mutual      = 0.5 * (L_cnn<-prompt + L_prompt<-cnn)
-```
-
-The first term updates the CNN toward the prompt branch prediction. The second term updates the prompt branch toward the CNN prediction. Stop-gradient targets keep each direction well-defined and prevent the branches from changing the target they are currently matching.
-
-### Total Objective
-
-```text
-L_total(t) = L_sup + lambda(t) * L_mutual
-```
-
-`lambda(t)` is zero during the supervised warmup and then follows a sigmoid ramp-up toward the configured consistency weight. The delayed ramp reduces confirmation bias from unreliable predictions early in training.
-
-## Algorithm 1: Semi-Supervised Mutual Learning
-
-```text
-Input:
-    labeled set D_l, unlabeled set D_u
-    CNN f_cnn, prompt model f_prompt
-    warmup T_w, consistency weight lambda_max
-
-for training iteration t = 1 ... T:
-    1. Sample B_l labeled scans and B_u unlabeled scans.
-    2. Normalize and augment the combined image batch x.
-    3. Compute CNN logits z_c = f_cnn(x).
-    4. Generate box and point prompts from stopgrad(sigmoid(z_c)).
-    5. Compute prompt-model logits z_p = f_prompt(x, boxes, points).
-    6. Compute Dice+BCE supervision for both branches on B_l only.
-    7. Compute bidirectional Dice consistency on B_l + B_u.
-    8. Set lambda(t) using warmup followed by sigmoid ramp-up.
-    9. Minimize L_sup + lambda(t) * L_mutual with Adam.
-   10. Update branch learning rates using polynomial decay.
-
-Return:
-    trained CNN f_cnn for validation and deployment
-```
-
-## Gradient Paths
 
 ```mermaid
-flowchart TD
-    GT["Ground-truth mask"] --> CS["CNN supervised loss"]
-    GT --> PS["Prompt supervised loss"]
-    CS --> CNN["CNN parameters"]
-    PS --> SAM["Prompt-model parameters"]
-    SP["Detached prompt prediction"] --> MC["CNN-directed consistency"]
-    MC --> CNN
-    SC["Detached CNN prediction"] --> MP["Prompt-directed consistency"]
-    MP --> SAM
-    CNN -. "detached coordinates" .-> PR["Prompt generation"]
-    PR --> SAM
+flowchart TB
+    ZCL["CNN logits on labeled samples<br/>z_c_l"] --> CNN_SUP["CNN supervised loss<br/>Dice + binary cross-entropy"]
+    YL1["Ground-truth masks y_l"] --> CNN_SUP
+
+    ZPL["Prompt logits on labeled samples<br/>z_p_l"] --> PROMPT_SUP["Prompt supervised loss<br/>Dice + binary cross-entropy"]
+    YL2["Ground-truth masks y_l"] --> PROMPT_SUP
+
+    ZCA["CNN logits on all samples<br/>z_c"] --> C_TO_P["Dice z_p, stopgrad z_c"]
+    ZPA["Prompt logits on all samples<br/>z_p"] --> C_TO_P
+    ZCA --> P_TO_C["Dice z_c, stopgrad z_p"]
+    ZPA --> P_TO_C
+
+    CNN_SUP --> LSUP["L_sup = 0.5 x (L_cnn + L_prompt)"]
+    PROMPT_SUP --> LSUP
+    C_TO_P --> LMUTUAL["L_mutual = 0.5 x (L_c_to_p + L_p_to_c)"]
+    P_TO_C --> LMUTUAL
+
+    ITER["Training iteration t"] --> WARMUP{"Supervised warmup complete?"}
+    WARMUP -->|No| ZERO["lambda t = 0"]
+    WARMUP -->|Yes| RAMP["Sigmoid consistency ramp-up<br/>lambda t approaches lambda max"]
+    ZERO --> WEIGHT["Consistency weight lambda t"]
+    RAMP --> WEIGHT
+
+    LSUP --> TOTAL["L_total = L_sup + lambda t x L_mutual"]
+    LMUTUAL --> TOTAL
+    WEIGHT --> TOTAL
+    TOTAL --> ADAM["Joint Adam optimization"]
+    ADAM --> CNN_UPDATE["Update CNN parameters"]
+    ADAM --> PROMPT_UPDATE["Update trainable SAM / MedSAM parameters"]
+    CNN_UPDATE --> POLY_CNN["Polynomial CNN learning-rate decay"]
+    PROMPT_UPDATE --> POLY_PROMPT["Polynomial prompt-model learning-rate decay"]
+
+    classDef supervised fill:#e7f6f1,stroke:#16866f,stroke-width:2px,color:#101828;
+    classDef mutual fill:#fff0ed,stroke:#d65f4b,stroke-width:2px,color:#101828;
+    classDef schedule fill:#fff8e8,stroke:#b7791f,stroke-width:2px,color:#101828;
+    classDef optimize fill:#f3effa,stroke:#7557a6,stroke-width:2px,color:#101828;
+    class ZCL,YL1,ZPL,YL2,CNN_SUP,PROMPT_SUP,LSUP supervised;
+    class ZCA,ZPA,C_TO_P,P_TO_C,LMUTUAL mutual;
+    class ITER,WARMUP,ZERO,RAMP,WEIGHT schedule;
+    class TOTAL,ADAM,CNN_UPDATE,PROMPT_UPDATE,POLY_CNN,POLY_PROMPT optimize;
 ```
 
-There is no gradient path from SAM through prompt coordinates into the CNN. Cross-branch learning occurs through the explicit mutual consistency terms.
+```mermaid
+flowchart TB
+    subgraph VALIDATION["Patient-wise validation during training"]
+        direction LR
+        VOLUME["Held-out validation OCT volume"] --> VNORM["Apply training intensity normalization"]
+        VNORM --> VCNN["Current EfficientNet-B2 U-Net"]
+        VCNN --> VPROB["Slice-wise foreground probabilities"]
+        VPROB --> VMASK["Binary cyst masks"]
+        VMASK --> METRICS["Volume Dice and segmentation metrics"]
+        METRICS --> BEST{"Mean Dice improved?"}
+        BEST -->|Yes| SAVE["Save cnn_best.pth"]
+        BEST -->|No| KEEP["Keep existing best checkpoint"]
+    end
 
-## Training and Inference Modes
+    subgraph INFERENCE["CNN-only test and deployment"]
+        direction LR
+        TESTVOL["Unseen patient OCT volume"] --> TNORM["Apply training intensity normalization"]
+        CHECKPOINT["cnn_best.pth"] --> TCNN["EfficientNet-B2 U-Net only"]
+        TNORM --> TCNN
+        TCNN --> TPROB["Cyst probability maps"]
+        TPROB --> TMASK["Final binary segmentations"]
+        TMASK --> OUTPUT["Patient-level predictions and metrics"]
+    end
 
-| Component | Training | Inference |
-|---|---:|---:|
-| Intensity normalization | Yes | Yes |
-| EfficientNet-B2 U-Net | Yes | Yes |
-| CNN-guided prompt generation | Yes | No |
-| SAM/MedSAM branch | Yes | No |
-| Labeled Dice+BCE | Labeled samples | No |
-| Mutual consistency | All samples | No |
+    SAVE --> CHECKPOINT
 
-The asymmetric deployment strategy is intentional: SAM/MedSAM acts as a training-time collaborator, while the efficient CNN provides standalone predictions at test time.
-
-## Modular Implementation Map
-
-| Architectural responsibility | Implementation |
-|---|---|
-| Experiment entrypoint | `train.py` |
-| Training orchestration and objective | `code/trainers/semisam_trainer.py` |
-| EfficientNet U-Net branch | `code/networks/efficient_unet.py` |
-| SAM/MedSAM adapter | `code/networks/sam_adapter.py` |
-| Model selection | `code/networks/net_factory.py` |
-| Mask-to-prompt conversion | `code/prompts/mask_prompts.py` |
-| Prompt strategy selection | `code/prompts/factory.py` |
-| Labeled/unlabeled batch construction | `code/dataloaders/oct_h5.py` |
-| Dice, BCE, and consistency losses | `code/utils/losses.py` |
-| Consistency ramp-up | `code/utils/ramps.py` |
-| CNN-only validation | `code/utils/validation.py` |
-| Reference experiment parameters | `code/configs/semisam_oct.yaml` |
-
-The factories isolate model, dataset, prompt, and trainer choices. Alternative encoders, prompt strategies, promptable models, or semi-supervised objectives can therefore be introduced without changing the top-level training entrypoint.
+    classDef validation fill:#eef4ff,stroke:#315b96,stroke-width:2px,color:#101828;
+    classDef checkpoint fill:#f3effa,stroke:#7557a6,stroke-width:2px,color:#101828;
+    classDef deployment fill:#e7f6f1,stroke:#16866f,stroke-width:2px,color:#101828;
+    class VOLUME,VNORM,VCNN,VPROB,VMASK,METRICS,BEST,KEEP validation;
+    class SAVE,CHECKPOINT checkpoint;
+    class TESTVOL,TNORM,TCNN,TPROB,TMASK,OUTPUT deployment;
+```
